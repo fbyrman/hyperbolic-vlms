@@ -1,15 +1,11 @@
 # Hyperbolic against Euclidean, grounded, on CC3M
 
-Isolates what hyperbolic geometry itself contributes to grounded vision-language
+Isolates what hyperbolic geometry contributes to grounded vision-language
 pretraining. MERU, HyCoCLIP, PHyCLIP and ARGENT are each trained against a
-Euclidean counterpart that holds the loss, the grounding, the data and the batch
-fixed and changes only the geometry, at ViT-S/16 and ViT-B/16, on CC3M with
-region-level grounding, contrasting over four signals: images, image captions,
-boxes, box captions.
+Euclidean twin, at ViT-S/16 and ViT-B/16, on CC3M with region-level grounding,
+contrasting over four signals: images, image captions, boxes, box captions.
 
-Each hyperbolic config has a `_euclidean_` twin. The pair is the unit of
-comparison, so a change that reaches one arm and not the other invalidates it:
-run both or neither.
+Model weights will be made available upon publication.
 
 ## Layout
 
@@ -19,7 +15,7 @@ configs/                         train_<method>[_euclidean]_vit_{s,b}.py + eval_
 scripts/train.py                 training entry point
 scripts/evaluate.py              evaluation entry point
 scripts/plot_origin_distances.py radial distribution of each signal, per model
-scripts/plot_curvature_figures.py  distortion, exterior-angle and aperture ratios
+scripts/plot_curvature_figures.py distance, exterior angle and aperture distortion
 scripts/extract_gligen_cc3m.py   GLIGEN TSVs -> webdataset tars + per-shard sidecars
 scripts/build_manifest.py        sidecars -> manifest.json, checks consistency
 scripts/sanity_check_cc3m.py     structural and visual check of one shard
@@ -62,12 +58,12 @@ pinned at revision `3f8d464e87669c5350787bdbc547f93dbb62357a` (483 TSV shards,
 ~518 GB). Those TSVs carry base64 JPEGs alongside the annotations, so no separate
 image download is needed and none of the samples are lost to dead links; shards
 are streamed over HTTP and never staged on disk. The extractor is idempotent,
-counting a shard as done only once its `.stats.json` sidecar exists, so a run
-that fails or is killed is resumed by repeating the command, and `--shard-start`
-with `--num-shards` splits the 483 shards over as many concurrent processes as
-you care to give it. Tar members are written with tarfile's zeroed default
-metadata, so a re-run at the same settings reproduces each shard byte for byte
-and the recorded sha256 stays valid.
+counting a shard as done only once its `.stats.json` sidecar exists, so an
+interrupted run is resumed by repeating the command, and `--shard-start` with
+`--num-shards` splits the 483 shards over as many concurrent processes as you
+care to give it. Tar members are written with tarfile's zeroed default metadata,
+so a re-run at the same settings reproduces each shard byte for byte and the
+recorded sha256 stays valid.
 
 Result: 483 shards, 3,016,640 samples, 125 GB. Each sample is `.jpg` (RGB,
 shortest side 256, quality 95), `.txt` (caption) and `.json` (caption, original
@@ -87,14 +83,11 @@ The matrix is `configs/train_<method>[_euclidean]_vit_{s,b}.py` over `meru`,
 line, e.g. `train.total_batch_size=768`.
 
 All runs are 100,000 iterations at `total_batch_size=512`. Batch size is global,
-so `--num-gpus` changes throughput and not the optimization, and a pair trained
-on different GPU counts is still a fair comparison. `train.num_workers` is the
-one knob worth re-tuning: the default of 4 underfeeds a fast GPU.
+so `--num-gpus` changes throughput and not the optimization.
 
-Checkpointing is periodic and `--resume` is a no-op on a fresh run, so a run
-killed by a walltime limit is resumed by repeating the command unchanged. Each
-run writes to `train_results/<parameters>/`, named after the config's own
-parameters rather than its filename.
+`--resume` is a no-op on a fresh run, so an interrupted run is resumed by
+repeating the command unchanged. Each run writes to `train_results/<parameters>/`,
+named after the config's own parameters rather than its filename.
 
 ## Evaluation
 
@@ -129,13 +122,10 @@ python scripts/evaluate.py --config configs/eval_zero_shot_classification_ambien
     --results-file evaluate_ambient.json
 ```
 
-`--results-file` matters: the ambient configs reuse the evaluator class of their
-default twin, so their results would otherwise be indistinguishable once
-appended to the same file. There is an `_ambient` config for each of the three
-tasks, each inheriting its default twin's suite and prompts so the two runs stay
-comparable dataset for dataset. The ablation is meaningless for the `Euclidean*`
-twins, which have no exponential map to remove, and they fall back to their
-default scoring.
+There is an `_ambient` config for each of the three tasks, each inheriting its
+default twin's suite and prompts so the two runs stay comparable dataset for
+dataset. The ablation is meaningless for the `Euclidean*` twins, which have no
+exponential map to remove, and they fall back to their default scoring.
 
 ## Figures
 
@@ -156,9 +146,9 @@ radius is the plain norm; the panels keep their order so a pair reads side by
 side. Product-space radii are combined the way the model's own metric combines
 them, so a PHyCLIP radius is on the same footing as a MERU one.
 
-### Curvature ratios
+### Distortion ratios
 
-Distortion, exterior angle and aperture, each as hyperbolic over Euclidean,
+Distance, exterior angle and aperture, each as hyperbolic over Euclidean,
 evaluated by the same functions the two arms of the ablation call. All three are
 1 at the origin, so a panel says where in the ball the geometry starts doing work
 flat space cannot.
@@ -185,17 +175,6 @@ python scripts/plot_curvature_figures.py --curv 0.1 0.5 1.0 2.0 \
 This needs neither the data nor a GPU, and `--rows` may name a bare quantity,
 there being no model to supply the relation. Use it for what the ratios do in
 general; use the default for what a trained model does with them.
-
-## Reproducibility notes
-
-- `train.seed` seeds Python, NumPy and torch, offset per rank. cuDNN runs in
-  benchmark mode, not deterministic mode, so runs are statistically rather than
-  bitwise reproducible on the same hardware.
-- Every run writes the fully resolved config to `config.yaml` in its output
-  directory, and `--resume` reloads that rather than the config file, so a
-  resumed job cannot silently change hyper-parameters.
-- Sample order depends on the shard glob and on world size: shards are split
-  across ranks, so a different GPU count sees a different interleaving.
 
 ## Credit
 
