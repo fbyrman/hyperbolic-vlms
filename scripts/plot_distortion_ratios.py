@@ -237,10 +237,12 @@ def mode(x: np.ndarray, resolution: int = 512) -> float:
     return float(grid[np.argmax(gaussian_kde(x)(grid))])
 
 
-def relation_label(relation) -> str:
-    """`parent -> child`, in the signal names the origin-distance figure uses."""
-    parent, child = SIGNALS[relation.parent][0], SIGNALS[relation.child][0]
-    return f"{parent.lower()} $\\to$ {child.lower()}"
+def relation_label(relation, sweep: str) -> str:
+    """`parent -> child`, or the apex alone where the child never enters."""
+    parent, child = SIGNALS[relation.parent][0].lower(), SIGNALS[relation.child][0].lower()
+    if sweep == "parent":
+        return f"{parent} apex"
+    return f"{parent} $\\to$ {child}"
 
 
 # One format per quantity, so no two panels invite a comparison at different
@@ -395,7 +397,7 @@ def draw(rows, methods, out_path: Path, resolution: int, r2_range, min_radius):
         if spec is not None:
             # With one relation per row, the axis symbol alone does not say
             # which pair the row is.
-            ylabel = f"{relation_label(spec)}\n{ylabel}"
+            ylabel = f"{relation_label(spec, SURFACES[quantity][4])}\n{ylabel}"
 
         for ax, method in zip(axes, methods):
             if i == 0:
