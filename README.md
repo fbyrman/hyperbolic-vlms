@@ -155,7 +155,7 @@ flat space cannot.
 
 ```bash
 python scripts/plot_distortion_ratios.py \
-    --rows distortion:text_image angle:text_image \
+    --rows distance:text_image angle:text_image \
     --out outputs/curvature_main.pdf
 ```
 
@@ -169,7 +169,7 @@ checkpoint loaded and no consumed region marked:
 
 ```bash
 python scripts/plot_distortion_ratios.py --curv 0.1 0.5 1.0 2.0 \
-    --r1 0.5 --r2-range 0 2 --rows distortion angle aperture
+    --r1 0.5 --r2-range 0 2 --rows distance angle aperture
 ```
 
 This needs neither the data nor a GPU, and `--rows` may name a bare quantity,

@@ -30,7 +30,7 @@ positives. It is the 1st-to-99th percentile of `r_2` crossed with the same range
 of `theta`, so it bounds the pairs rather than holding a stated fraction of them.
 
     python scripts/plot_distortion_ratios.py \\
-        --rows distortion:text_image angle:text_image \\
+        --rows distance:text_image angle:text_image \\
         --out outputs/curvature_main.pdf
 """
 
@@ -185,7 +185,7 @@ def get_aperture_surface(r1, r2, c, theta, min_radius=0.1):
 # Surface, colourbar label, the relations it is defined on, how the loss pairs
 # them up, which end of the relation is swept up the y axis, and that axis' name.
 SURFACES = {
-    "distortion": (
+    "distance": (
         get_distortion_ratio, r"$r_d$", CONTRASTED, "all_pairs", "child", r"$r_2$", CMAP,
     ),
     "angle": (
@@ -465,11 +465,15 @@ def main():
     parser.add_argument(
         "--rows",
         nargs="+",
-        default=["distortion:text_image", "angle:text_image"],
+        default=["distance:text_image", "angle:text_image"],
         metavar="QUANTITY:RELATION",
-        help="One row per entry. distortion: text_image, image_text, box, "
-             "box_flip. angle and aperture: text_image, box, cross_image, "
-             "cross_text.",
+        help="One row of the figure per entry, as QUANTITY:RELATION. "
+             "QUANTITY is distance, angle or aperture. RELATION is "
+             "PARENT_CHILD, naming the signal pinned at r_1 and the one swept "
+             "over r_2: distance takes text_image, image_text, box "
+             "(box_text -> box_image), box_flip; angle and aperture take "
+             "text_image, box, cross_image (box_image -> image), cross_text "
+             "(box_text -> text).",
     )
     parser.add_argument(
         "--curv",
