@@ -237,6 +237,12 @@ def mode(x: np.ndarray, resolution: int = 512) -> float:
     return float(grid[np.argmax(gaussian_kde(x)(grid))])
 
 
+def relation_label(relation) -> str:
+    """`parent -> child`, in the signal names the origin-distance figure uses."""
+    parent, child = SIGNALS[relation.parent][0], SIGNALS[relation.child][0]
+    return f"{parent.lower()} $\\to$ {child.lower()}"
+
+
 # One format per quantity, so no two panels invite a comparison at different
 # precision.
 RATIO_FMT, RADIUS_FMT = "%.3f", "%.2f"
@@ -304,7 +310,15 @@ def draw_surface_row(axes, cax, methods, quantity, panels, window, grids, limits
                 0.5, 0.5, missing, transform=ax.transAxes, ha="center",
                 va="center", color=MUTED, fontsize=8,
             )
-            ax.set_axis_off()
+            # Framed like its neighbours rather than switched off: the leftmost
+            # panel carries the row's label and y scale, and MERU is missing
+            # every box relation.
+            ax.set_xlim(0.0, np.pi)
+            ax.set_ylim(*window)
+            ax.set_xticks([0, np.pi / 2, np.pi])
+            ax.set_xticklabels(["$0$", r"$\pi/2$", r"$\pi$"])
+            if method == methods[0]:
+                ax.yaxis.set_major_formatter(FormatStrFormatter(RADIUS_FMT))
             continue
         mesh = ax.pcolormesh(
             Theta, R2, surfaces[method], cmap=SURFACES[quantity][6], shading="auto",
@@ -378,10 +392,12 @@ def draw(rows, methods, out_path: Path, resolution: int, r2_range, min_radius):
             axes, cax, methods, quantity, panels, window, grids[i], limits[quantity]
         )
         ylabel = SURFACES[quantity][5]
+        if spec is not None:
+            # With one relation per row, the axis symbol alone does not say
+            # which pair the row is.
+            ylabel = f"{relation_label(spec)}\n{ylabel}"
 
         for ax, method in zip(axes, methods):
-            if not ax.axison:
-                continue
             if i == 0:
                 p = panels.get(method)
                 title = DISPLAY.get(method, method)
@@ -389,7 +405,7 @@ def draw(rows, methods, out_path: Path, resolution: int, r2_range, min_radius):
                     title += f"\n$c = {p['c']:.2f}$"
                 ax.set_title(title, color=INK, pad=4, fontsize=9)
             if method == methods[0]:
-                ax.set_ylabel(ylabel, fontsize=12, color=INK)
+                ax.set_ylabel(ylabel, fontsize=10 if spec is not None else 12, color=INK)
             else:
                 ax.set_yticklabels([])
             if i == nrow - 1:
