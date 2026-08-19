@@ -20,6 +20,7 @@ footing as a MERU one.
 
 import argparse
 import csv
+import glob
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,9 +49,8 @@ DISPLAY = {
     "argent": "ARGENT",
 }
 
-# Categorical slots 1, 2, 3, 7 of the house palette. Slot 4 collides with slot 2
-# for full-colour readers (OKLab dE 13.7, below the floor of 15); violet clears
-# every pair at 16.3 normal / 9.2 simulated.
+# Categorical slots 1, 2, 3, 7 of the house palette. Slot 4 is too close to slot
+# 2 to separate; violet clears every pair, simulated deficiency included.
 SIGNALS = {
     "image": ("Image", "#2a78d6"),
     "text": ("Text", "#eb6834"),
@@ -70,10 +70,9 @@ class Relation:
 
 
 # `oxy_angle(parent, child)` against the cone at `parent`, on the matched
-# diagonal. Four terms, not one: the two cross relations take a box as the
-# parent, and one of them never involves a text at all. There are no mirrors
-# here -- the angle is read at the parent, so a flipped pair is a quantity no
-# model computes.
+# diagonal, one term per relation the grounded losses supervise. Not mirrored:
+# the angle is read at the parent, so a flipped pair is a quantity no model
+# computes.
 ENTAILED = (
     Relation("text_image", "text", "image"),
     Relation("box", "box_text", "box_image"),
@@ -81,9 +80,9 @@ ENTAILED = (
     Relation("cross_text", "box_text", "text"),
 )
 
-# `pairwise_dist` is only ever called cross-modally, and over the whole `B x B`
-# grid, so the negatives are as much of the consumed region as the positives.
-# It is symmetric, so which side is pinned is ours to choose and both appear.
+# `pairwise_dist` runs cross-modally over the whole `B x B` grid, so negatives
+# are as much of the consumed region as positives. It is symmetric, so both
+# pins appear.
 CONTRASTED = (
     Relation("text_image", "text", "image"),
     Relation("image_text", "image", "text"),
@@ -100,14 +99,63 @@ def supported(relations, signals) -> list[Relation]:
     return [r for r in relations if r.parent in signals and r.child in signals]
 
 
-def load_model(method: str, arch: str, device, euclidean: bool = False):
+def parse_checkpoints(pairs) -> dict[str, Path]:
+    """`method=path` overrides, for weights that do not sit under `--results-dir`."""
+    out = {}
+    for pair in pairs or []:
+        method, sep, path = pair.partition("=")
+        if not sep or not path:
+            raise SystemExit(f"--checkpoint takes method=path, got {pair!r}")
+        out[method] = Path(path).expanduser()
+    return out
+
+
+def sample_batches(num_samples: int, batch_size: int) -> list:
+    """One fixed set of samples, so every model is read on the same images and
+    captions rather than on its own draw from the shuffle."""
+    cfg = LazyConfig.load("configs/cc3m_dataset.py")
+    cfg.dataset.infinite_stream = False
+    cfg.dataset.seed = 0
+    if not [f for p in cfg.dataset.tarfiles for f in glob.glob(p)]:
+        raise SystemExit(
+            f"no shards match {list(cfg.dataset.tarfiles)}; set CC3M_GROUNDED_DIR"
+        )
+    loader = torch.utils.data.DataLoader(
+        instantiate(cfg.dataset), batch_size=batch_size, num_workers=4
+    )
+    batches, taken = [], 0
+    for batch in loader:
+        batches.append(batch)
+        taken += batch["image"].shape[0]
+        if taken >= num_samples:
+            break
+    print(f"{taken} samples over {len(batches)} batches")
+    return batches
+
+
+def load_model(
+    method: str,
+    arch: str,
+    device,
+    euclidean: bool = False,
+    results_dir: str = "train_results",
+    checkpoint: Path | None = None,
+):
     suffix = "_euclidean" if euclidean else ""
     config = Path("configs") / f"train_{method}{suffix}_vit_{arch}.py"
     cfg = LazyConfig.load(str(config))
-    run = Path(generate_output_dir_name(cfg))
-    checkpoint = run / "checkpoint_final.pth"
-    if not checkpoint.is_file():
-        return None, None, None
+    if checkpoint is None:
+        # Runs are named after their parameters, not after the config file, so
+        # the directory is derived rather than guessed. `--checkpoint` is the
+        # way in for downloaded weights, which carry no such directory.
+        run = Path(results_dir) / Path(generate_output_dir_name(cfg)).name
+        checkpoint = run / "checkpoint_final.pth"
+        if not checkpoint.is_file():
+            return None, None, None
+    elif not checkpoint.is_file():
+        # An explicit path is a claim the file is there; skipping it silently
+        # would drop a panel the caller asked for by name.
+        raise SystemExit(f"{method}: no checkpoint at {checkpoint}")
     model = instantiate(cfg.model).to(device).eval()
     CheckpointManager(model=model).load(str(checkpoint))
     # From the config, not the model: only PHyCLIP keeps use_boxes as an
@@ -115,7 +163,7 @@ def load_model(method: str, arch: str, device, euclidean: bool = False):
     signals = ["image", "text"]
     if cfg.model.get("use_boxes", False):
         signals += ["box_image", "box_text"]
-    return model, signals, run
+    return model, signals, checkpoint
 
 
 def factors(model, feats: torch.Tensor) -> torch.Tensor:
@@ -193,8 +241,8 @@ def draw(results: dict[str, dict[str, np.ndarray]], out_path: Path):
             "ytick.labelsize": 9,
             "pdf.fonttype": 42,
             "ps.fonttype": 42,
-            # Computer Modern, as on the distortion figure. cmr10 ships no
-            # U+2212, so the hyphen-minus stands in or negative ticks box out.
+            # cmr10 ships no U+2212, so the hyphen-minus stands in or negative
+            # ticks box out.
             "font.family": "serif",
             "font.serif": ["cmr10", "DejaVu Serif"],
             "mathtext.fontset": "cm",
@@ -215,8 +263,8 @@ def draw(results: dict[str, dict[str, np.ndarray]], out_path: Path):
             if signal not in dists:
                 continue
             density, edges = histogram(dists[signal])
-            # Surface-coloured underlay: image and box image land within a few
-            # thousandths of each other, and without it the two outlines merge.
+            # Underlay: image and box image land within a few thousandths, and
+            # the two outlines merge without it.
             ax.stairs(density, edges, color="white", lw=2.6, zorder=3)
             ax.stairs(density, edges, color=colour, lw=1.0, label=label, zorder=4)
             ax.stairs(density, edges, color=colour, alpha=0.16, fill=True, lw=0, zorder=2)
@@ -261,6 +309,19 @@ def main():
     parser.add_argument(
         "--euclidean", action="store_true", help="Read the Euclidean ablation twins."
     )
+    parser.add_argument(
+        "--results-dir",
+        default="train_results",
+        help="Directory holding the run directories.",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        nargs="+",
+        metavar="METHOD=PATH",
+        help="Point one method at a checkpoint file directly, e.g. "
+             "meru=weights/meru_vit_s.pth. Missing files raise here rather "
+             "than dropping the panel.",
+    )
     parser.add_argument("--out")
     parser.add_argument(
         "--usetex",
@@ -275,25 +336,15 @@ def main():
 
     device = torch.device(args.device)
 
-    # One fixed set of samples, held in memory, so every model is read on the
-    # same images and captions rather than on its own draw from the shuffle.
-    cfg = LazyConfig.load("configs/cc3m_dataset.py")
-    cfg.dataset.infinite_stream = False
-    cfg.dataset.seed = 0
-    loader = torch.utils.data.DataLoader(
-        instantiate(cfg.dataset), batch_size=args.batch_size, num_workers=4
-    )
-    batches, taken = [], 0
-    for batch in loader:
-        batches.append(batch)
-        taken += batch["image"].shape[0]
-        if taken >= args.num_samples:
-            break
-    print(f"{taken} samples over {len(batches)} batches")
+    batches = sample_batches(args.num_samples, args.batch_size)
 
+    overrides = parse_checkpoints(args.checkpoint)
     results = {}
     for method in args.methods:
-        model, signals, run = load_model(method, args.arch, device, args.euclidean)
+        model, signals, _ = load_model(
+            method, args.arch, device, args.euclidean,
+            args.results_dir, overrides.get(method),
+        )
         if model is None:
             print(f"  skip {method}: no checkpoint_final.pth")
             continue

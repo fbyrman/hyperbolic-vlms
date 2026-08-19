@@ -80,10 +80,9 @@ evaluator = L(ZeroShotClassificationEvaluator)(
             "birds : {}.",
             "bird photography : {}.",
         ],
-        # SUN397 has no auto-download: `DE.SUN397` reads parquet shards that
-        # have to be staged under `datasets/eval/sun397` first, and a missing
-        # copy aborts the whole suite rather than one dataset. Uncomment once
-        # they are in place.
+        # `DE.SUN397` reads parquet shards that have to be staged under
+        # `datasets/eval/sun397` first, and a missing copy aborts the whole
+        # suite. Uncomment once they are in place.
         # "sun397": [
         #     "a photo of a {}.",
         #     "a photo of the {}.",

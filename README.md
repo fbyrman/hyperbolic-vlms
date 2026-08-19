@@ -15,7 +15,7 @@ configs/                         train_<method>[_euclidean]_vit_{s,b}.py + eval_
 scripts/train.py                 training entry point
 scripts/evaluate.py              evaluation entry point
 scripts/plot_origin_distances.py radial distribution of each signal, per model
-scripts/plot_curvature_figures.py distance, exterior angle and aperture distortion
+scripts/plot_distortion_ratios.py  distance, exterior angle and aperture distortion
 scripts/extract_gligen_cc3m.py   GLIGEN TSVs -> webdataset tars + per-shard sidecars
 scripts/build_manifest.py        sidecars -> manifest.json, checks consistency
 scripts/sanity_check_cc3m.py     structural and visual check of one shard
@@ -154,7 +154,7 @@ evaluated by the same functions the two arms of the ablation call. All three are
 flat space cannot.
 
 ```bash
-python scripts/plot_curvature_figures.py \
+python scripts/plot_distortion_ratios.py \
     --rows distortion:text_image angle:text_image \
     --out outputs/curvature_main.pdf
 ```
@@ -168,7 +168,7 @@ of the region its inputs actually occupy.
 checkpoint loaded and no consumed region marked:
 
 ```bash
-python scripts/plot_curvature_figures.py --curv 0.1 0.5 1.0 2.0 \
+python scripts/plot_distortion_ratios.py --curv 0.1 0.5 1.0 2.0 \
     --r1 0.5 --r2-range 0 2 --rows distortion angle aperture
 ```
 

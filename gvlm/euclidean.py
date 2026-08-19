@@ -11,8 +11,8 @@ from __future__ import annotations
 import torch
 from torch import Tensor
 
-# acos/asin have infinite derivatives at +-1, and 1 - 1e-8 is not representable in
-# float32, so the clamp bound cannot be tied to the much smaller `eps` below.
+# Not tied to `eps`: 1 - 1e-8 rounds to 1.0 in float32, leaving acos/asin on
+# their vertical tangent.
 _TRIG_BOUND = 1.0 - 1e-6
 
 
@@ -73,9 +73,8 @@ def oxy_angle(x: Tensor, y: Tensor, eps: float = 1e-8) -> Tensor:
     xy_dist = torch.norm(y - x, dim=-1)
 
     acos_numer = y_norm**2 - x_norm**2 - xy_dist**2
-    # `lorentz.py` floors sinh^2 of the separation, so its guard on the separation
-    # itself is sqrt(eps); against an unsquared `xy_dist` the same constant floors
-    # four orders lower and the gradient diverges as the two points coincide.
+    # sqrt(eps) because `lorentz.py` floors the squared separation; `eps` here
+    # would let the gradient diverge as `y` approaches `x`.
     acos_denom = 2 * x_norm * torch.clamp(xy_dist, min=eps**0.5) + eps
 
     return torch.acos(torch.clamp(acos_numer / acos_denom, min=-_TRIG_BOUND, max=_TRIG_BOUND))

@@ -1,10 +1,10 @@
-"""Plot the three curvature ratios over the region each model actually consumes.
+"""Plot the three distortion ratios over the region each model actually consumes.
 
 Every ratio is hyperbolic over Euclidean, evaluated by the same functions the two
 arms of the ablation call, so a panel is the pair's own reading of one
 configuration rather than a restatement of either arm:
 
-    distortion  geodesic distance over the tangent-space chord
+    distance    geodesic distance over the tangent-space chord
     angle       `L.oxy_angle` over `E.oxy_angle` at the same apex
     aperture    `L.half_aperture` over `E.half_aperture` at the twin's 2K/sqrt(c)
 
@@ -29,7 +29,7 @@ the matched diagonal for the angle ratio, whose entailment term reads only
 positives. It is the 1st-to-99th percentile of `r_2` crossed with the same range
 of `theta`, so it bounds the pairs rather than holding a stated fraction of them.
 
-    python scripts/plot_curvature_figures.py \\
+    python scripts/plot_distortion_ratios.py \\
         --rows distortion:text_image angle:text_image \\
         --out outputs/curvature_main.pdf
 """
@@ -54,27 +54,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from gvlm import euclidean as E  # noqa: E402
 from gvlm import lorentz as L  # noqa: E402
-from gvlm.config import LazyConfig, instantiate  # noqa: E402
 from gvlm.models import ARGENT  # noqa: E402
 from plot_origin_distances import CONTRASTED, DISPLAY, ENTAILED, GRID, INK  # noqa: E402
 from plot_origin_distances import METHODS, MUTED, SIGNALS  # noqa: E402
 from plot_origin_distances import combine, embed, factors, load_model  # noqa: E402
+from plot_origin_distances import parse_checkpoints, sample_batches  # noqa: E402
 from plot_origin_distances import origin_distance, supported  # noqa: E402
 
-# The blue and orange of the origin-distance figure as diverging poles, over the
-# neutral the house pair uses. Cool to warm through a grey that reads as
-# "nothing", so the midpoint sits where curvature stops mattering.
+# The origin-distance blue and orange as diverging poles, through the house
+# neutral, so the midpoint sits where curvature stops mattering.
 CMAP = LinearSegmentedColormap.from_list(
     "gvlm_div_blue_orange",
     ["#1c5cab", "#2a78d6", "#86b6ef", "#f0efec", "#f5b483", "#eb6834", "#c2461a"],
 )
 
-# The aperture ratio cannot exceed 1, so it only ever occupies the cool half.
-# Handing it the full diverging map would put its no-effect plateau at the warm
-# pole and read as the opposite of what it is: this is that half, alone. A ratio
-# of 1 starts at the house blue rather than at a near-white, because almost every
-# apex sits at exactly 1 and a panel ramping to the neutral reads as blank paper
-# rather than as a value.
+# The aperture ratio cannot exceed 1, so it takes the cool half alone rather
+# than a diverging map that would put its no-effect plateau at the warm pole. A
+# ratio of 1 starts at the house blue, not near-white: almost every apex sits at
+# exactly 1, and a panel ramping to the neutral reads as blank paper.
 CMAP_COOL = LinearSegmentedColormap.from_list(
     "gvlm_seq_blue", ["#0a2f5c", "#12508f", "#2a78d6", "#5b9be8", "#86b6ef"]
 )
@@ -124,16 +121,14 @@ def get_angle_ratio(r1, r2, c, theta, tol: float = 1e-6):
     ratio = get_exterior_angle(r1, r2, c, theta) / np.maximum(
         get_flat_exterior_angle(r1, r2, theta), 1e-15
     )
-    # Both angles vanish as theta -> 0 with the far point outside, and both run
-    # to pi with it inside, so the quotient is 0/0 on one half of that edge and
-    # 1 on the other. The law of sines gives the first limit outright.
+    # Both angles vanish as theta -> 0 with the far point outside and run to pi
+    # with it inside, so the quotient is 0/0 on one half of that edge and 1 on
+    # the other. The law of sines gives the first limit.
     xi1, xi2 = np.sqrt(c) * r1, np.sqrt(c) * np.broadcast_to(r2, theta.shape)
     gap = xi2 - xi1
     outward = gap > tol
-    # Both factors of the denominator are guarded, not just `gap`: `np.where`
-    # evaluates the branch it discards, and an analytic window may start at
-    # `r2 = 0`, where `xi2` vanishes and the quotient warns before being thrown
-    # away.
+    # `np.where` evaluates the branch it discards, so both factors are guarded:
+    # an analytic window may start at `r2 = 0`, where `xi2` vanishes.
     denom = np.where(outward, xi2, 1.0) * np.sinh(np.where(outward, gap, 1.0))
     limit = np.where(outward, np.sinh(xi2) * gap / denom, 1.0)
     return np.where(theta < tol, limit, ratio)
@@ -144,13 +139,10 @@ def clamp_radius(c: float, min_radius: float) -> float:
     return float(np.arcsinh(2 * min_radius) / np.sqrt(c))
 
 
-# `lorentz` bounds its asin at 1 - 1e-8 and `euclidean` at 1 - 1e-6, and inside
-# the clamped neighbourhood that gap is the entire quotient: it puts the plateau
-# at 1 + 8e-4 and reads as curvature widening a cone it has not touched. Both
-# arms are held to the same bound here so the plateau is exactly 1. This is the
-# one place the figure departs from the arms' own code, and it only moves the
-# epsilon -- the un-clamping mismatch below is unaffected, since `2K/sinh(xi)`
-# reaches 1 at `xi = asinh(2K)` and `2K/xi` at `xi = 2K` whatever the bound is.
+# The one place the figure departs from the arms' own code: `lorentz` bounds its
+# asin at 1 - 1e-8 and `euclidean` at 1 - 1e-6, and inside the clamped
+# neighbourhood that gap is the entire quotient, reading as curvature widening a
+# cone it has not touched. Both are held to the same bound so the plateau is 1.
 _ASIN_EPS = 1e-8
 
 
@@ -245,8 +237,8 @@ def mode(x: np.ndarray, resolution: int = 512) -> float:
     return float(grid[np.argmax(gaussian_kde(x)(grid))])
 
 
-# One format for every ratio and one for every radius, so no two panels invite
-# a comparison at different precision.
+# One format per quantity, so no two panels invite a comparison at different
+# precision.
 RATIO_FMT, RADIUS_FMT = "%.3f", "%.2f"
 
 
@@ -318,9 +310,8 @@ def draw_surface_row(axes, cax, methods, quantity, panels, window, grids, limits
             Theta, R2, surfaces[method], cmap=SURFACES[quantity][6], shading="auto",
             vmin=vmin, vmax=vmax, rasterized=True,
         )
-        # Where this model's own inputs to this quantity land. Marking only the
-        # radii would imply every angle is consumed equally, and the pairs
-        # concentrate far too tightly for that to be honest.
+        # Where this model's own inputs land. Radii alone would imply every
+        # angle is consumed equally, and the pairs concentrate far too tightly.
         if "y_lo" in p:
             ax.add_patch(
                 Rectangle(
@@ -432,13 +423,13 @@ def row_key(quantity, relation) -> str:
     return quantity if relation is None else f"{quantity}:{relation.key}"
 
 
-def cached_embed(method, arch, model, signals, batches, device, cache_dir, run):
+def cached_embed(method, arch, model, signals, batches, device, cache_dir, checkpoint):
     """Embeddings are the whole cost of these figures and never change for a
     finished checkpoint, so a run that only reshapes a panel pays nothing."""
     if cache_dir is None:
         return embed(model, signals, batches, device)
     taken = sum(b["image"].shape[0] for b in batches)
-    stamp = int((Path(run) / "checkpoint_final.pth").stat().st_mtime)
+    stamp = int(Path(checkpoint).stat().st_mtime)
     path = Path(cache_dir) / f"{method}_{arch}_{taken}_{stamp}.pt"
     if path.is_file():
         blob = torch.load(path)
@@ -497,6 +488,19 @@ def main():
         help="The pinned radius, with --curv. Read off the model otherwise.",
     )
     parser.add_argument("--arch", default="s", choices=["s", "b"])
+    parser.add_argument(
+        "--results-dir",
+        default="train_results",
+        help="Directory holding the run directories.",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        nargs="+",
+        metavar="METHOD=PATH",
+        help="Point one method at a checkpoint file directly, e.g. "
+             "meru=weights/meru_vit_s.pth. Missing files raise here rather "
+             "than dropping the panel.",
+    )
     parser.add_argument("--num-samples", type=int, default=2048)
     parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument(
@@ -520,7 +524,7 @@ def main():
     )
     parser.add_argument("--cache-dir", default="outputs/.embed_cache")
     parser.add_argument("--no-cache", action="store_true")
-    parser.add_argument("--out", default="outputs/curvature_figure.pdf")
+    parser.add_argument("--out", default="outputs/distortion_ratios.pdf")
     parser.add_argument(
         "--usetex",
         action="store_true",
@@ -537,9 +541,8 @@ def main():
             "ytick.labelsize": 9,
             "pdf.fonttype": 42,
             "ps.fonttype": 42,
-            # Computer Modern without a LaTeX toolchain: mathtext draws the same
-            # glyphs LaTeX would for the symbols here. cmr10 ships no U+2212, so
-            # the hyphen-minus has to stand in or every negative tick is a box.
+            # cmr10 ships no U+2212, so the hyphen-minus stands in or negative
+            # ticks box out.
             "font.family": "serif",
             "font.serif": ["cmr10", "DejaVu Serif"],
             "mathtext.fontset": "cm",
@@ -567,30 +570,22 @@ def main():
     cache_dir = None if args.no_cache else args.cache_dir
     device = torch.device(args.device)
 
-    cfg = LazyConfig.load("configs/cc3m_dataset.py")
-    cfg.dataset.infinite_stream = False
-    cfg.dataset.seed = 0
-    loader = torch.utils.data.DataLoader(
-        instantiate(cfg.dataset), batch_size=args.batch_size, num_workers=4
-    )
-    batches, taken = [], 0
-    for batch in loader:
-        batches.append(batch)
-        taken += batch["image"].shape[0]
-        if taken >= args.num_samples:
-            break
-    print(f"{taken} samples over {len(batches)} batches")
+    batches = sample_batches(args.num_samples, args.batch_size)
 
+    overrides = parse_checkpoints(args.checkpoint)
     methods = []
     for method in args.methods:
-        model, signals, run = load_model(method, args.arch, device)
+        model, signals, checkpoint = load_model(
+            method, args.arch, device,
+            results_dir=args.results_dir, checkpoint=overrides.get(method),
+        )
         if model is None:
             print(f"  skip {method}: no checkpoint_final.pth")
             continue
         methods.append(method)
         print(f"  {method:<10} c={model_curvature(model):.3f}")
         feats = cached_embed(
-            method, args.arch, model, signals, batches, device, cache_dir, run
+            method, args.arch, model, signals, batches, device, cache_dir, checkpoint
         )
         for quantity, relation in wanted:
             key = row_key(quantity, relation)
