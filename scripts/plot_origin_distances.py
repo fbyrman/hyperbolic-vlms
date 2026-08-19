@@ -62,11 +62,16 @@ INK, MUTED, GRID = "#0b0b0b", "#52514e", "#d8d7d2"
 
 @dataclass(frozen=True)
 class Relation:
-    """A pair of signals with one pinned at `r1` and one swept over `r2`."""
+    """A pair of signals with one pinned at `r1` and one swept over `r2`.
+
+    `pairing` is how the loss reads the pair: `all_pairs` for a term that scores
+    the whole `B x B` grid, `diagonal` for one that scores matched pairs only.
+    """
 
     key: str
     parent: str
     child: str
+    pairing: str = "all_pairs"
 
 
 # `oxy_angle(parent, child)` against the cone at `parent`, on the matched
@@ -74,20 +79,22 @@ class Relation:
 # the angle is read at the parent, so a flipped pair is a quantity no model
 # computes.
 ENTAILED = (
-    Relation("text_image", "text", "image"),
-    Relation("box", "box_text", "box_image"),
-    Relation("cross_image", "box_image", "image"),
-    Relation("cross_text", "box_text", "text"),
+    Relation("text_image", "text", "image", "diagonal"),
+    Relation("box", "box_text", "box_image", "diagonal"),
+    Relation("cross_image", "box_image", "image", "diagonal"),
+    Relation("cross_text", "box_text", "text", "diagonal"),
 )
 
-# `pairwise_dist` runs cross-modally over the whole `B x B` grid, so negatives
-# are as much of the consumed region as positives. It is symmetric, so both
-# pins appear.
+# The four `pairwise_dist` calls the contrastive term makes, over the whole
+# `B x B` grid, so negatives are as much of the consumed region as positives.
+# A box is scored against the other modality's whole image or caption, never
+# against the other box, so there is no box-to-box distance to draw. The
+# inter-modal pair is symmetric and appears under both pins.
 CONTRASTED = (
     Relation("text_image", "text", "image"),
     Relation("image_text", "image", "text"),
-    Relation("box", "box_text", "box_image"),
-    Relation("box_flip", "box_image", "box_text"),
+    Relation("box_image", "box_image", "text"),
+    Relation("box_text", "box_text", "image"),
 )
 
 

@@ -36,6 +36,7 @@ of `theta`, so it bounds the pairs rather than holding a stated fraction of them
 
 import argparse
 import sys
+from typing import Callable, NamedTuple
 from pathlib import Path
 
 import matplotlib
@@ -56,6 +57,7 @@ from gvlm import euclidean as E  # noqa: E402
 from gvlm import lorentz as L  # noqa: E402
 from gvlm.models import ARGENT  # noqa: E402
 from plot_origin_distances import CONTRASTED, DISPLAY, ENTAILED, GRID, INK  # noqa: E402
+from plot_origin_distances import Relation  # noqa: E402
 from plot_origin_distances import METHODS, MUTED, SIGNALS  # noqa: E402
 from plot_origin_distances import combine, embed, factors, load_model  # noqa: E402
 from plot_origin_distances import parse_checkpoints, sample_batches  # noqa: E402
@@ -182,19 +184,34 @@ def get_aperture_surface(r1, r2, c, theta, min_radius=0.1):
     return np.broadcast_to(get_aperture_ratio(r2, c, min_radius), np.shape(theta)).copy()
 
 
-# Surface, colourbar label, the relations it is defined on, how the loss pairs
-# them up, which end of the relation is swept up the y axis, and that axis' name.
+# ARGENT alone takes a distance between a box and its source, as the weight
+# `1 - exp(-d)` on the two cross entailment terms. It reads only matched pairs.
+WEIGHTED = (
+    Relation("cross_image", "box_image", "image", "diagonal"),
+    Relation("cross_text", "box_text", "text", "diagonal"),
+)
+WEIGHTED_KEYS = {r.key for r in WEIGHTED}
+
+
+class Surface(NamedTuple):
+    fn: Callable
+    label: str
+    catalog: tuple
+    sweep: str
+    ylabel: str
+    cmap: LinearSegmentedColormap
+
+
 SURFACES = {
-    "distance": (
-        get_distortion_ratio, r"$r_d$", CONTRASTED, "all_pairs", "child", r"$r_2$", CMAP,
+    "distance": Surface(
+        get_distortion_ratio, r"$r_d$", CONTRASTED + WEIGHTED, "child", r"$r_2$", CMAP
     ),
-    "angle": (
-        get_angle_ratio, r"$r_{\mathrm{ext}}$", ENTAILED, "diagonal", "child", r"$r_2$",
-        CMAP,
+    "angle": Surface(
+        get_angle_ratio, r"$r_{\mathrm{ext}}$", ENTAILED, "child", r"$r_2$", CMAP
     ),
-    "aperture": (
-        get_aperture_surface, r"$r_{\mathrm{aper}}$", ENTAILED, "diagonal", "parent",
-        r"$r_1$", CMAP_COOL,
+    "aperture": Surface(
+        get_aperture_surface, r"$r_{\mathrm{aper}}$", ENTAILED, "parent", r"$r_1$",
+        CMAP_COOL,
     ),
 }
 
@@ -296,7 +313,7 @@ def row_window(panels: dict, quantity: str, override=None) -> tuple[float, float
 
 
 def row_surfaces(quantity, panels, window, resolution):
-    surface = SURFACES[quantity][0]
+    surface = SURFACES[quantity].fn
     Theta, R2 = np.meshgrid(
         np.linspace(0.0, np.pi, resolution), np.linspace(*window, resolution)
     )
@@ -327,7 +344,7 @@ def draw_surface_row(axes, cax, methods, quantity, panels, window, grids, limits
                 ax.yaxis.set_major_formatter(FormatStrFormatter(RADIUS_FMT))
             continue
         mesh = ax.pcolormesh(
-            Theta, R2, surfaces[method], cmap=SURFACES[quantity][6], shading="auto",
+            Theta, R2, surfaces[method], cmap=SURFACES[quantity].cmap, shading="auto",
             vmin=vmin, vmax=vmax, rasterized=True,
         )
         # Where this model's own inputs land. Radii alone would imply every
@@ -341,7 +358,7 @@ def draw_surface_row(axes, cax, methods, quantity, panels, window, grids, limits
                     fill=False, edgecolor=INK, lw=0.7, ls=(0, (3, 2)), alpha=0.65, zorder=3,
                 )
             )
-        if SURFACES[quantity][4] == "child":
+        if SURFACES[quantity].sweep == "child":
             # Bottom right: the consumed box sits at low theta in every model,
             # so this is the one corner it cannot collide with.
             ax.annotate(
@@ -359,7 +376,7 @@ def draw_surface_row(axes, cax, methods, quantity, panels, window, grids, limits
             ax.yaxis.set_major_formatter(FormatStrFormatter(RADIUS_FMT))
 
     bar = cax.figure.colorbar(mesh, cax=cax)
-    bar.set_label(SURFACES[quantity][1], fontsize=13, color=INK)
+    bar.set_label(SURFACES[quantity].label, fontsize=13, color=INK)
     # A flat quantity has no range to tick; one label says what it is worth.
     bar.set_ticks([vmax] if flat else np.linspace(vmin, vmax, 5))
     bar.ax.yaxis.set_major_formatter(FormatStrFormatter(RATIO_FMT))
@@ -397,11 +414,11 @@ def draw(rows, methods, out_path: Path, resolution: int, r2_range, min_radius):
         draw_surface_row(
             axes, cax, methods, quantity, panels, window, grids[i], limits[quantity]
         )
-        ylabel = SURFACES[quantity][5]
+        ylabel = SURFACES[quantity].ylabel
         if spec is not None:
             # With one relation per row, the axis symbol alone does not say
             # which pair the row is.
-            ylabel = f"{relation_label(spec, SURFACES[quantity][4])}\n{ylabel}"
+            ylabel = f"{relation_label(spec, SURFACES[quantity].sweep)}\n{ylabel}"
 
         for ax, method in zip(axes, methods):
             if i == 0:
@@ -435,7 +452,7 @@ def parse_row(spec: str, needs_relation: bool = True):
         raise SystemExit(f"unknown quantity {quantity!r}; pick from {list(SURFACES)}")
     if not key and not needs_relation:
         return quantity, None
-    catalog = {r.key: r for r in SURFACES[quantity][2]}
+    catalog = {r.key: r for r in SURFACES[quantity].catalog}
     if key not in catalog:
         raise SystemExit(f"{quantity} is not defined on {key!r}; pick from {list(catalog)}")
     return quantity, catalog[key]
@@ -619,15 +636,17 @@ def main():
             missing = None
             if not supported([relation], signals):
                 missing = "no boxes"
+            elif relation.key in WEIGHTED_KEYS and quantity == "distance" and not isinstance(model, ARGENT):
+                missing = "no distance"
             elif coneless:
                 missing = "no cone"
             if missing:
                 cells[key][method] = {"missing": missing}
                 print(f"    {key:<26} {missing}")
                 continue
-            _, _, _, pairing, sweep, _, _ = SURFACES[quantity]
             p = occupancy(
-                model, feats, relation, pairing, sweep, args.spread, args.min_radius
+                model, feats, relation, relation.pairing, SURFACES[quantity].sweep,
+                args.spread, args.min_radius,
             )
             cells[key][method] = p
             print(
