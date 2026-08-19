@@ -268,6 +268,11 @@ def occupancy(model, feats, relation, pairing, sweep, spread, min_radius) -> dic
     }
 
 
+def has_surface(panel) -> bool:
+    """A panel carrying geometry, as opposed to one recording why it has none."""
+    return panel is not None and "missing" not in panel
+
+
 def analytic_panel(curv: float, r1: float, min_radius: float) -> dict:
     """A panel from a stated geometry rather than from a checkpoint's embeddings.
 
@@ -281,9 +286,9 @@ def analytic_panel(curv: float, r1: float, min_radius: float) -> dict:
 def row_window(panels: dict, quantity: str, override=None) -> tuple[float, float]:
     if override:
         return tuple(override)
-    if any("y_lo" not in p for p in panels.values() if p is not None):
+    if any("y_lo" not in p for p in panels.values() if has_surface(p)):
         raise SystemExit("--r2-range is required without a model to read it from")
-    drawn = [p for p in panels.values() if p is not None]
+    drawn = [p for p in panels.values() if has_surface(p)]
     lo = min(p["y_lo"] for p in drawn)
     hi = max(p["y_hi"] for p in drawn)
     pad = 0.05 * (hi - lo)
@@ -295,7 +300,7 @@ def row_surfaces(quantity, panels, window, resolution):
     Theta, R2 = np.meshgrid(
         np.linspace(0.0, np.pi, resolution), np.linspace(*window, resolution)
     )
-    drawn = {m: p for m, p in panels.items() if p is not None}
+    drawn = {m: p for m, p in panels.items() if has_surface(p)}
     return Theta, R2, {m: surface(p["r1"], R2, p["c"], Theta) for m, p in drawn.items()}
 
 
@@ -306,10 +311,9 @@ def draw_surface_row(axes, cax, methods, quantity, panels, window, grids, limits
     mesh = None
     for ax, method in zip(axes, methods):
         p = panels.get(method)
-        if p is None:
-            missing = "no entailment cone" if quantity == "aperture" else "relation not trained"
+        if not has_surface(p):
             ax.text(
-                0.5, 0.5, missing, transform=ax.transAxes, ha="center",
+                0.5, 0.5, p["missing"], transform=ax.transAxes, ha="center",
                 va="center", color=MUTED, fontsize=8,
             )
             # Framed like its neighbours rather than switched off: the leftmost
@@ -403,7 +407,7 @@ def draw(rows, methods, out_path: Path, resolution: int, r2_range, min_radius):
             if i == 0:
                 p = panels.get(method)
                 title = DISPLAY.get(method, method)
-                if p is not None and "y_lo" in p:
+                if has_surface(p) and "y_lo" in p:
                     title += f"\n$c = {p['c']:.2f}$"
                 ax.set_title(title, color=INK, pad=4, fontsize=9)
             if method == methods[0]:
@@ -464,7 +468,7 @@ def finish(cells, wanted, methods, args):
     rows = []
     for quantity, spec in wanted:
         panels = cells[row_key(quantity, spec)]
-        if all(p is None for p in panels.values()):
+        if not any(has_surface(p) for p in panels.values()):
             print(f"  drop row {row_key(quantity, spec)}: no model has it")
             continue
         rows.append((quantity, spec, panels))
@@ -612,9 +616,14 @@ def main():
         for quantity, relation in wanted:
             key = row_key(quantity, relation)
             coneless = quantity == "aperture" and isinstance(model, CONELESS)
-            if coneless or not supported([relation], signals):
-                cells[key][method] = None
-                print(f"    {key:<26} {'no cone' if coneless else 'not trained'}")
+            missing = None
+            if not supported([relation], signals):
+                missing = "no boxes"
+            elif coneless:
+                missing = "no cone"
+            if missing:
+                cells[key][method] = {"missing": missing}
+                print(f"    {key:<26} {missing}")
                 continue
             _, _, _, pairing, sweep, _, _ = SURFACES[quantity]
             p = occupancy(
