@@ -87,10 +87,12 @@ CMAP_COOL = LinearSegmentedColormap.from_list(
 CONELESS = (ARGENT,)
 
 # What an empty panel says. A model lacking the signals, lacking the term over
-# signals it has, or lacking a cone are one fact to a reader: nothing in its
-# loss reads this row. The three are kept apart on stdout, where they are a
-# check on the catalog rather than a reading of the model.
-UNSUPERVISED = "not supervised"
+# signals it has, or lacking a cone are one fact to a reader, and it is about
+# the loss rather than about the pair: a quantity the model never forms is not
+# a weak reading of that pair, it is no reading at all. The three are kept apart
+# on stdout, where they are a check on the catalog rather than a reading of the
+# model.
+UNSUPERVISED = "not in the loss"
 
 def get_distortion_ratio(r1, r2, c, theta):
     sqrt_c = np.sqrt(c)
@@ -404,7 +406,8 @@ def draw_surface_row(axes, cax, methods, quantity, panels, window, grids, limits
     bar.outline.set_visible(False)
 
 
-def draw(rows, methods, out_path: Path, resolution: int, r2_range, min_radius):
+def draw(rows, methods, curvatures, out_path: Path, resolution: int, r2_range,
+         min_radius):
     nrow, ncol = len(rows), len(methods)
     fig = plt.figure(figsize=(2.15 * ncol + 0.75, 2.6 * nrow), constrained_layout=True)
     gs = fig.add_gridspec(nrow, ncol + 1, width_ratios=[1.0] * ncol + [0.055])
@@ -442,10 +445,13 @@ def draw(rows, methods, out_path: Path, resolution: int, r2_range, min_radius):
 
         for ax, method in zip(axes, methods):
             if i == 0:
-                p = panels.get(method)
                 title = DISPLAY.get(method, method)
-                if has_surface(p) and "y_lo" in p:
-                    title += f"\n$c = {p['c']:.2f}$"
+                # Off the model, not off the row: a column with nothing to draw
+                # still reports the curvature it was read at, so an empty one
+                # reads as a model that forms no such quantity rather than as a
+                # model left out.
+                if method in curvatures:
+                    title += f"\n$c = {curvatures[method]:.2f}$"
                 ax.set_title(title, color=INK, pad=4, fontsize=9)
             if method == methods[0]:
                 ax.set_ylabel(ylabel, fontsize=10 if spec is not None else 12, color=INK)
@@ -501,7 +507,7 @@ def cached_embed(method, arch, model, signals, batches, device, cache_dir, check
     return feats
 
 
-def finish(cells, wanted, methods, args):
+def finish(cells, wanted, methods, curvatures, args):
     rows = []
     for quantity, spec in wanted:
         panels = cells[row_key(quantity, spec)]
@@ -514,7 +520,8 @@ def finish(cells, wanted, methods, args):
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    draw(rows, methods, out, args.resolution, args.r2_range, args.min_radius)
+    draw(rows, methods, curvatures, out, args.resolution, args.r2_range,
+         args.min_radius)
     print(f"\n{out}  (+ .png)")
 
 
@@ -629,7 +636,7 @@ def main():
             for quantity, relation in wanted:
                 cells[row_key(quantity, relation)][label] = panel
             print(f"  c={curv:<8g} r1={args.r1:.3f}  r_min={panel['r_min']:.3f}")
-        return finish(cells, wanted, methods, args)
+        return finish(cells, wanted, methods, {}, args)
 
     cache_dir = None if args.no_cache else args.cache_dir
     device = torch.device(args.device)
@@ -637,7 +644,7 @@ def main():
     batches = sample_batches(args.num_samples, args.batch_size)
 
     overrides = parse_checkpoints(args.checkpoint)
-    methods = []
+    methods, curvatures = [], {}
     for method in args.methods:
         model, signals, checkpoint = load_model(
             method, args.arch, device,
@@ -647,7 +654,8 @@ def main():
             print(f"  skip {method}: no checkpoint_final.pth")
             continue
         methods.append(method)
-        print(f"  {method:<10} c={model_curvature(model):.3f}")
+        curvatures[method] = model_curvature(model)
+        print(f"  {method:<10} c={curvatures[method]:.3f}")
         feats = cached_embed(
             method, args.arch, model, signals, batches, device, cache_dir, checkpoint
         )
@@ -681,7 +689,7 @@ def main():
     if not methods:
         raise SystemExit("no checkpoints found; nothing to plot")
 
-    return finish(cells, wanted, methods, args)
+    return finish(cells, wanted, methods, curvatures, args)
 
 
 if __name__ == "__main__":
