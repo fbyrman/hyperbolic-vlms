@@ -86,6 +86,12 @@ CMAP_COOL = LinearSegmentedColormap.from_list(
 # ARGENT reads the angle but never forms a cone.
 CONELESS = (ARGENT,)
 
+# What an empty panel says. A model lacking the signals, lacking the term over
+# signals it has, or lacking a cone are one fact to a reader: nothing in its
+# loss reads this row. The three are kept apart on stdout, where they are a
+# check on the catalog rather than a reading of the model.
+UNSUPERVISED = "not supervised"
+
 def get_distortion_ratio(r1, r2, c, theta):
     sqrt_c = np.sqrt(c)
     xi1, xi2 = sqrt_c * r1, sqrt_c * r2
@@ -209,18 +215,21 @@ class Surface(NamedTuple):
     sweep: str
     ylabel: str
     cmap: LinearSegmentedColormap
+    arrow: str
 
 
 SURFACES = {
     "distance": Surface(
-        get_distortion_ratio, r"$r_d$", CONTRASTED + WEIGHTED, "child", r"$r_2$", CMAP
+        get_distortion_ratio, r"$r_d$", CONTRASTED + WEIGHTED, "child", r"$r_2$", CMAP,
+        r"$\leftrightarrow$",
     ),
     "angle": Surface(
-        get_angle_ratio, r"$r_{\mathrm{ext}}$", ENTAILED, "child", r"$r_2$", CMAP
+        get_angle_ratio, r"$r_{\mathrm{ext}}$", ENTAILED, "child", r"$r_2$", CMAP,
+        r"$\to$",
     ),
     "aperture": Surface(
         get_aperture_surface, r"$r_{\mathrm{aper}}$", ENTAILED, "parent", r"$r_1$",
-        CMAP_COOL,
+        CMAP_COOL, "",
     ),
 }
 
@@ -263,14 +272,14 @@ def mode(x: np.ndarray, resolution: int = 512) -> float:
     return float(grid[np.argmax(gaussian_kde(x)(grid))])
 
 
-def relation_label(relation, sweep: str) -> str:
-    """The call the row draws: what is pinned, and what it is read against."""
+def relation_label(relation, surface) -> str:
+    """The row's pair, with `r_1` marked on the signal whose mode pins it."""
     parent, child = SIGNALS[relation.parent][0].lower(), SIGNALS[relation.child][0].lower()
-    if sweep == "parent":
+    if surface.sweep == "parent":
         return f"{parent} apex"
     if relation.pairing == "all_pairs":
         child = f"all {child}"
-    return f"{parent} $\\to$ {child}"
+    return f"{parent} ($r_1$) {surface.arrow} {child}"
 
 
 # One format per quantity, so no two panels invite a comparison at different
@@ -429,7 +438,7 @@ def draw(rows, methods, out_path: Path, resolution: int, r2_range, min_radius):
         if spec is not None:
             # With one relation per row, the axis symbol alone does not say
             # which pair the row is.
-            ylabel = f"{relation_label(spec, SURFACES[quantity].sweep)}\n{ylabel}"
+            ylabel = f"{relation_label(spec, SURFACES[quantity])}\n{ylabel}"
 
         for ax, method in zip(axes, methods):
             if i == 0:
@@ -653,7 +662,7 @@ def main():
             elif coneless:
                 missing = "no cone"
             if missing:
-                cells[key][method] = {"missing": missing}
+                cells[key][method] = {"missing": UNSUPERVISED}
                 print(f"    {key:<26} {missing}")
                 continue
             p = occupancy(
