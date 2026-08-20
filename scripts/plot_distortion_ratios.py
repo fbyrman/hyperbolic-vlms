@@ -18,12 +18,15 @@ across relations. Panels label the axes `r_1` and `r_2` only; which signals
 those are is fixed by the row and belongs in the caption. The output filename
 names them.
 
-No relation is mirrored: the pin is the argument the loss queries with, so a
-row exists where a term makes that call and not where the same two signals
-could be read the other way round. The image-text distance carries two rows
-because the contrastive term normalises it in both directions. The aperture
-depends on the apex radius alone, so it takes apexes rather than pairs and is a
-curve rather than a surface.
+Whether a pair has a second pin follows the function, not the call. The angle is
+read at the apex, so a flipped pair is a quantity no model computes. The
+distance is symmetric, so the pin is a display choice and both are named --
+though a figure wants one row per pair, the flipped pin being a second line
+through the same surface rather than a second view of the pair. What a pin does
+hide is the spread of the pinned signal itself, which no mirror recovers; over
+the occupied region that is worth at most 0.001 of ratio on the grounded models
+and 0.009 on ARGENT. The aperture depends on the apex radius alone, so it takes
+apexes rather than pairs and is a curve rather than a surface.
 
 The marked rectangle is where the model's own inputs land, over the pairs the
 row's own term reads: the whole `B x B` grid where it scores every negative, the
@@ -188,10 +191,13 @@ def get_aperture_surface(r1, r2, c, theta, min_radius=0.1):
 
 # ARGENT alone takes a distance between a box and its source, as the weight
 # `1 - exp(-d)` on the two cross entailment terms. It reads only matched pairs,
-# and inherits the apex of the angle it gates, so there is no flipped call.
+# and is named under both pins like the contrastive ones: the angle it gates is
+# directed, the distance it gates with is not.
 WEIGHTED = (
     Relation("cross_image", "box_image", "image", "diagonal"),
+    Relation("cross_image_flip", "image", "box_image", "diagonal"),
     Relation("cross_text", "box_text", "text", "diagonal"),
+    Relation("cross_text_flip", "text", "box_text", "diagonal"),
 )
 WEIGHTED_KEYS = {r.key for r in WEIGHTED}
 
@@ -512,13 +518,13 @@ def main():
         default=["distance:text_image", "angle:text_image"],
         metavar="QUANTITY:RELATION",
         help="One row of the figure per entry, as QUANTITY:RELATION. "
-             "QUANTITY is distance, angle or aperture. RELATION names the "
-             "signal pinned at r_1 and the one swept over r_2: distance takes "
-             "text_image, image_text, box_image (box_image -> text), box_text "
-             "(box_text -> image), cross_image (box_image -> image) and "
-             "cross_text (box_text -> text); angle and aperture take "
-             "text_image, box (box_text -> box_image), cross_image and "
-             "cross_text.",
+             "RELATION names the signal pinned at r_1 and the one swept over "
+             "r_2. angle and aperture take text_image, box (box_text -> "
+             "box_image), cross_image (box_image -> image) and cross_text "
+             "(box_text -> text). distance takes those four plus box_image "
+             "(box_image -> text) and box_text (box_text -> image), and being "
+             "symmetric also takes each under the opposite pin with a _flip "
+             "suffix; image_text is text_image flipped under its own name.",
     )
     parser.add_argument(
         "--curv",

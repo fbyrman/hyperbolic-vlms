@@ -85,18 +85,22 @@ ENTAILED = (
     Relation("cross_text", "box_text", "text", "diagonal"),
 )
 
-# The four `pairwise_dist` calls the contrastive term makes, over the whole
-# `B x B` grid, so negatives are as much of the consumed region as positives.
-# A box is scored against the other modality's whole image or caption, never
-# against the other box, so there is no box-to-box distance to draw. The pin is
-# the call's query argument, and the image-text pair carries two rows because it
-# is the pair the term normalises in both directions, not because the distance
-# is symmetric.
+# The three pairs the contrastive term scores, over the whole `B x B` grid, so
+# negatives are as much of the consumed region as positives. A box is scored
+# against the other modality's whole image or caption, never against the other
+# box, so there is no box-to-box distance to draw.
+#
+# The distance is symmetric, so which of a pair is pinned is a display choice
+# and both are named. A figure wants one of them: over the region a pair
+# occupies the two pins read the same surface along two lines through it, and
+# the flipped line is worth at most 0.001 of ratio on the grounded models.
 CONTRASTED = (
     Relation("text_image", "text", "image"),
     Relation("image_text", "image", "text"),
     Relation("box_image", "box_image", "text"),
+    Relation("box_image_flip", "text", "box_image"),
     Relation("box_text", "box_text", "image"),
+    Relation("box_text_flip", "image", "box_text"),
 )
 
 
