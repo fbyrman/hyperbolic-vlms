@@ -74,10 +74,8 @@ class Relation:
     pairing: str = "all_pairs"
 
 
-# `oxy_angle(parent, child)` against the cone at `parent`, on the matched
-# diagonal, one term per relation the grounded losses supervise. Not mirrored:
-# the angle is read at the parent, so a flipped pair is a quantity no model
-# computes.
+# `oxy_angle(parent, child)` at the cone on `parent`, over matched pairs, one
+# term per relation the grounded losses supervise. Not mirrored.
 ENTAILED = (
     Relation("text_image", "text", "image", "diagonal"),
     Relation("box", "box_text", "box_image", "diagonal"),
@@ -85,15 +83,10 @@ ENTAILED = (
     Relation("cross_text", "box_text", "text", "diagonal"),
 )
 
-# The three pairs the contrastive term scores, over the whole `B x B` grid, so
-# negatives are as much of the consumed region as positives. A box is scored
-# against the other modality's whole image or caption, never against the other
-# box, so there is no box-to-box distance to draw.
-#
-# The distance is symmetric, so which of a pair is pinned is a display choice
-# and both are named. A figure wants one of them: over the region a pair
-# occupies the two pins read the same surface along two lines through it, and
-# the flipped line is worth at most 0.001 of ratio on the grounded models.
+# The pairs the contrastive term scores, over the whole `B x B` grid. A box is
+# scored against the other modality's image or caption, never against the other
+# box, so there is no box-to-box distance. The pin is a display choice, worth at
+# most 0.001 of ratio on the grounded models, and both are named.
 CONTRASTED = (
     Relation("text_image", "text", "image"),
     Relation("image_text", "image", "text"),

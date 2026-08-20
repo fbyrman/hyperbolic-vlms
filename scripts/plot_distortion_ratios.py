@@ -1,38 +1,21 @@
-"""Plot the three distortion ratios over the region each model actually consumes.
+"""Plot the three distortion ratios over the region each model consumes.
 
-Every ratio is hyperbolic over Euclidean, evaluated by the same functions the two
-arms of the ablation call, so a panel is the pair's own reading of one
-configuration rather than a restatement of either arm:
+Each ratio is hyperbolic over Euclidean, evaluated by the functions the two arms
+of the ablation call:
 
     distance    geodesic distance over the tangent-space chord
     angle       `L.oxy_angle` over `E.oxy_angle` at the same apex
     aperture    `L.half_aperture` over `E.half_aperture` at the twin's 2K/sqrt(c)
 
-All three are 1 at the origin, so a panel says where in the ball the geometry
-starts doing work flat space cannot.
+A row is one quantity on one relation: a pair of signals with one pinned at the
+mode of its radial distribution, `r_1`, and the other swept over `r_2`. The
+angle is read at an apex and has no mirror; the distance is symmetric, so both
+pins are named and a figure draws one. The aperture takes an apex rather than a
+pair, and is flat in `theta`.
 
-A row is one quantity read on one relation -- a pair of signals with one pinned
-at `r_1` and the other swept over `r_2`. The relation is the unit the losses
-consume, and the grounded models consume several, so `r_1` is never pooled
-across relations. Panels label the axes `r_1` and `r_2` only; which signals
-those are is fixed by the row and belongs in the caption. The output filename
-names them.
-
-Whether a pair has a second pin follows the function, not the call. The angle is
-read at the apex, so a flipped pair is a quantity no model computes. The
-distance is symmetric, so the pin is a display choice and both are named --
-though a figure wants one row per pair, the flipped pin being a second line
-through the same surface rather than a second view of the pair. What a pin does
-hide is the spread of the pinned signal itself, which no mirror recovers; over
-the occupied region that is worth at most 0.001 of ratio on the grounded models
-and 0.009 on ARGENT. The aperture depends on the apex radius alone, so it takes
-apexes rather than pairs and is a curve rather than a surface.
-
-The marked rectangle is where the model's own inputs land, over the pairs the
-row's own term reads: the whole `B x B` grid where it scores every negative, the
-matched diagonal where it reads positives only. It is the 1st-to-99th percentile
-of `r_2` crossed with the same range of `theta`, so it bounds the pairs rather
-than holding a stated fraction of them.
+The dashed rectangle is the 1st-to-99th percentile of `r_2` and `theta` over the
+pairs the row's term reads: the whole `B x B` grid where it scores negatives,
+the matched diagonal where it reads positives only.
 
     python scripts/plot_distortion_ratios.py \\
         --rows distance:text_image angle:text_image \\
@@ -75,10 +58,8 @@ CMAP = LinearSegmentedColormap.from_list(
     ["#1c5cab", "#2a78d6", "#86b6ef", "#f0efec", "#f5b483", "#eb6834", "#c2461a"],
 )
 
-# The aperture ratio cannot exceed 1, so it takes the cool half alone rather
-# than a diverging map that would put its no-effect plateau at the warm pole. A
-# ratio of 1 starts at the house blue, not near-white: almost every apex sits at
-# exactly 1, and a panel ramping to the neutral reads as blank paper.
+# Sequential, not diverging: the ratio cannot exceed 1, and almost every apex
+# sits at exactly 1, which a map ramping to the neutral would read as blank.
 CMAP_COOL = LinearSegmentedColormap.from_list(
     "gvlm_seq_blue", ["#0a2f5c", "#12508f", "#2a78d6", "#5b9be8", "#86b6ef"]
 )
@@ -86,12 +67,8 @@ CMAP_COOL = LinearSegmentedColormap.from_list(
 # ARGENT reads the angle but never forms a cone.
 CONELESS = (ARGENT,)
 
-# What an empty panel says. A model lacking the signals, lacking the term over
-# signals it has, or lacking a cone are one fact to a reader, and it is about
-# the loss rather than about the pair: a quantity the model never forms is not
-# a weak reading of that pair, it is no reading at all. The three are kept apart
-# on stdout, where they are a check on the catalog rather than a reading of the
-# model.
+# Missing signals, missing term and missing cone are one fact to a reader.
+# stdout keeps them apart, as a check on the catalog.
 UNSUPERVISED = "not in the loss"
 
 def get_distortion_ratio(r1, r2, c, theta):
@@ -154,10 +131,8 @@ def clamp_radius(c: float, min_radius: float) -> float:
     return float(np.arcsinh(2 * min_radius) / np.sqrt(c))
 
 
-# The one place the figure departs from the arms' own code: `lorentz` bounds its
-# asin at 1 - 1e-8 and `euclidean` at 1 - 1e-6, and inside the clamped
-# neighbourhood that gap is the entire quotient, reading as curvature widening a
-# cone it has not touched. Both are held to the same bound so the plateau is 1.
+# `lorentz` bounds its asin at 1 - 1e-8 and `euclidean` at 1 - 1e-6; inside the
+# clamped neighbourhood that gap is the whole quotient. Both take the finer one.
 _ASIN_EPS = 1e-8
 
 
@@ -198,9 +173,7 @@ def get_aperture_surface(r1, r2, c, theta, min_radius=0.1):
 
 
 # ARGENT alone takes a distance between a box and its source, as the weight
-# `1 - exp(-d)` on the two cross entailment terms. It reads only matched pairs,
-# and is named under both pins like the contrastive ones: the angle it gates is
-# directed, the distance it gates with is not.
+# `1 - exp(-d)` on its two cross entailment terms, over matched pairs.
 WEIGHTED = (
     Relation("cross_image", "box_image", "image", "diagonal"),
     Relation("cross_image_flip", "image", "box_image", "diagonal"),
@@ -355,9 +328,8 @@ def draw_surface_row(axes, cax, methods, quantity, panels, window, grids, limits
                 0.5, 0.5, p["missing"], transform=ax.transAxes, ha="center",
                 va="center", color=MUTED, fontsize=8,
             )
-            # Framed like its neighbours rather than switched off: the leftmost
-            # panel carries the row's label and y scale, and MERU is missing
-            # every box relation.
+            # Framed, not switched off: the leftmost panel carries the row's
+            # label and y scale.
             ax.set_xlim(0.0, np.pi)
             ax.set_ylim(*window)
             ax.set_xticks([0, np.pi / 2, np.pi])
@@ -446,10 +418,8 @@ def draw(rows, methods, curvatures, out_path: Path, resolution: int, r2_range,
         for ax, method in zip(axes, methods):
             if i == 0:
                 title = DISPLAY.get(method, method)
-                # Off the model, not off the row: a column with nothing to draw
-                # still reports the curvature it was read at, so an empty one
-                # reads as a model that forms no such quantity rather than as a
-                # model left out.
+                # Off the model, not off the row, so a column with nothing to
+                # draw still reports the curvature it was read at.
                 if method in curvatures:
                     title += f"\n$c = {curvatures[method]:.2f}$"
                 ax.set_title(title, color=INK, pad=4, fontsize=9)
