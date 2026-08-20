@@ -252,8 +252,6 @@ def relation_label(relation, surface) -> str:
     parent, child = SIGNALS[relation.parent][0].lower(), SIGNALS[relation.child][0].lower()
     if surface.sweep == "parent":
         return f"{parent} apex"
-    if relation.pairing == "all_pairs":
-        child = f"all {child}"
     return f"{parent} ($r_1$) {surface.arrow} {child}"
 
 
