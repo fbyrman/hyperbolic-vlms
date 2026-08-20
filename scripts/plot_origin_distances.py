@@ -88,8 +88,10 @@ ENTAILED = (
 # The four `pairwise_dist` calls the contrastive term makes, over the whole
 # `B x B` grid, so negatives are as much of the consumed region as positives.
 # A box is scored against the other modality's whole image or caption, never
-# against the other box, so there is no box-to-box distance to draw. The
-# inter-modal pair is symmetric and appears under both pins.
+# against the other box, so there is no box-to-box distance to draw. The pin is
+# the call's query argument, and the image-text pair carries two rows because it
+# is the pair the term normalises in both directions, not because the distance
+# is symmetric.
 CONTRASTED = (
     Relation("text_image", "text", "image"),
     Relation("image_text", "image", "text"),

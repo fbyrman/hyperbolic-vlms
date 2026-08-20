@@ -13,21 +13,23 @@ starts doing work flat space cannot.
 
 A row is one quantity read on one relation -- a pair of signals with one pinned
 at `r_1` and the other swept over `r_2`. The relation is the unit the losses
-consume, and there are four for the grounded models, not one, so `r_1` is never
-pooled across relations. Panels label the axes `r_1` and `r_2` only; which
-signals those are is fixed by the row and belongs in the caption. The output
-filename names them.
+consume, and the grounded models consume several, so `r_1` is never pooled
+across relations. Panels label the axes `r_1` and `r_2` only; which signals
+those are is fixed by the row and belongs in the caption. The output filename
+names them.
 
-The angle is read at the apex, so its relations are directed and have no
-mirrors. The distortion ratio is symmetric, so the pin is a display choice and
-both pins are offered. The aperture depends on the apex radius alone, so it
-takes apexes rather than pairs and is a curve rather than a surface.
+No relation is mirrored: the pin is the argument the loss queries with, so a
+row exists where a term makes that call and not where the same two signals
+could be read the other way round. The image-text distance carries two rows
+because the contrastive term normalises it in both directions. The aperture
+depends on the apex radius alone, so it takes apexes rather than pairs and is a
+curve rather than a surface.
 
-The marked rectangle is where the model's own inputs land: the whole `B x B`
-grid for the distortion ratio, whose contrastive term reads every negative, and
-the matched diagonal for the angle ratio, whose entailment term reads only
-positives. It is the 1st-to-99th percentile of `r_2` crossed with the same range
-of `theta`, so it bounds the pairs rather than holding a stated fraction of them.
+The marked rectangle is where the model's own inputs land, over the pairs the
+row's own term reads: the whole `B x B` grid where it scores every negative, the
+matched diagonal where it reads positives only. It is the 1st-to-99th percentile
+of `r_2` crossed with the same range of `theta`, so it bounds the pairs rather
+than holding a stated fraction of them.
 
     python scripts/plot_distortion_ratios.py \\
         --rows distance:text_image angle:text_image \\
@@ -185,7 +187,8 @@ def get_aperture_surface(r1, r2, c, theta, min_radius=0.1):
 
 
 # ARGENT alone takes a distance between a box and its source, as the weight
-# `1 - exp(-d)` on the two cross entailment terms. It reads only matched pairs.
+# `1 - exp(-d)` on the two cross entailment terms. It reads only matched pairs,
+# and inherits the apex of the angle it gates, so there is no flipped call.
 WEIGHTED = (
     Relation("cross_image", "box_image", "image", "diagonal"),
     Relation("cross_text", "box_text", "text", "diagonal"),
@@ -255,10 +258,12 @@ def mode(x: np.ndarray, resolution: int = 512) -> float:
 
 
 def relation_label(relation, sweep: str) -> str:
-    """`parent -> child`, or the apex alone where the child never enters."""
+    """The call the row draws: what is pinned, and what it is read against."""
     parent, child = SIGNALS[relation.parent][0].lower(), SIGNALS[relation.child][0].lower()
     if sweep == "parent":
         return f"{parent} apex"
+    if relation.pairing == "all_pairs":
+        child = f"all {child}"
     return f"{parent} $\\to$ {child}"
 
 
@@ -507,12 +512,13 @@ def main():
         default=["distance:text_image", "angle:text_image"],
         metavar="QUANTITY:RELATION",
         help="One row of the figure per entry, as QUANTITY:RELATION. "
-             "QUANTITY is distance, angle or aperture. RELATION is "
-             "PARENT_CHILD, naming the signal pinned at r_1 and the one swept "
-             "over r_2: distance takes text_image, image_text, box "
-             "(box_text -> box_image), box_flip; angle and aperture take "
-             "text_image, box, cross_image (box_image -> image), cross_text "
-             "(box_text -> text).",
+             "QUANTITY is distance, angle or aperture. RELATION names the "
+             "signal pinned at r_1 and the one swept over r_2: distance takes "
+             "text_image, image_text, box_image (box_image -> text), box_text "
+             "(box_text -> image), cross_image (box_image -> image) and "
+             "cross_text (box_text -> text); angle and aperture take "
+             "text_image, box (box_text -> box_image), cross_image and "
+             "cross_text.",
     )
     parser.add_argument(
         "--curv",
