@@ -28,6 +28,7 @@ from pathlib import Path
 import matplotlib
 import numpy as np
 import torch
+from scipy.stats import gaussian_kde
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -221,26 +222,10 @@ def collect(model, signals, batches, device) -> dict[str, np.ndarray]:
     }
 
 
-def histogram(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Density and bin edges, binned per signal rather than per panel.
-
-    Within a panel the spreads differ by up to 7x -- image radii are a spike
-    next to box text -- so one shared bin width either smears the wide signal or
-    collapses the narrow one to a single bar. Freedman-Diaconis on each signal's
-    own spread resolves both; `density=True` keeps unit area under each, so the
-    curves stay comparable despite the differing widths.
-    """
-    q25, q75 = np.percentile(values, [25, 75])
-    width = 2 * (q75 - q25) / len(values) ** (1 / 3)
-    span = values.max() - values.min()
-    bins = 30 if width <= 0 else int(np.clip(round(span / width), 15, 120))
-    return np.histogram(values, bins=bins, density=True)
-
-
 def draw(results: dict[str, dict[str, np.ndarray]], out_path: Path):
     plt.rcParams.update(
         {
-            "font.size": 8,
+            "font.size": 11,
             "axes.labelsize": 11,
             "axes.titlesize": 11,
             "xtick.labelsize": 9,
@@ -264,16 +249,17 @@ def draw(results: dict[str, dict[str, np.ndarray]], out_path: Path):
         lo = min(d.min() for d in dists.values())
         hi = max(d.max() for d in dists.values())
         pad = 0.06 * (hi - lo or 1.0)
+        grid = np.linspace(lo - pad, hi + pad, 512)
 
         for signal, (label, colour) in SIGNALS.items():
             if signal not in dists:
                 continue
-            density, edges = histogram(dists[signal])
+            density = gaussian_kde(dists[signal])(grid)
             # Underlay: image and box image land within a few thousandths, and
-            # the two outlines merge without it.
-            ax.stairs(density, edges, color="white", lw=2.6, zorder=3)
-            ax.stairs(density, edges, color=colour, lw=1.0, label=label, zorder=4)
-            ax.stairs(density, edges, color=colour, alpha=0.16, fill=True, lw=0, zorder=2)
+            # the two curves merge without it.
+            ax.plot(grid, density, color="white", lw=3.0, zorder=3, solid_capstyle="round")
+            ax.plot(grid, density, color=colour, lw=1.6, label=label, zorder=4)
+            ax.fill_between(grid, density, color=colour, alpha=0.13, lw=0, zorder=2)
 
         ax.set_xlim(lo - pad, hi + pad)
         ax.set_ylim(bottom=0)
@@ -287,8 +273,8 @@ def draw(results: dict[str, dict[str, np.ndarray]], out_path: Path):
         ax.spines["bottom"].set_color(GRID)
         ax.tick_params(colors=MUTED, length=2)
 
-    axes[0].set_ylabel("density")
-    fig.supxlabel("distance from origin", fontsize=11, color=INK)
+    axes[0].set_ylabel("Density")
+    fig.supxlabel("Distance from origin", fontsize=11, color=INK)
     handles = [
         plt.Line2D([], [], color=c, lw=1.6, label=lab) for lab, c in SIGNALS.values()
     ]
