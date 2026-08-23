@@ -69,7 +69,7 @@ CONELESS = (ARGENT,)
 
 # Missing signals, missing term and missing cone are one fact to a reader.
 # stdout keeps them apart, as a check on the catalog.
-UNSUPERVISED = "not in the loss"
+UNSUPERVISED = "Not in the loss"
 
 def get_distortion_ratio(r1, r2, c, theta):
     sqrt_c = np.sqrt(c)
@@ -278,7 +278,7 @@ def mode(x: np.ndarray, resolution: int = 512) -> float:
 
 def relation_label(relation, surface) -> str:
     """The row's pair, with `r_1` marked on the signal whose mode pins it."""
-    parent, child = SIGNALS[relation.parent][0].lower(), SIGNALS[relation.child][0].lower()
+    parent, child = SIGNALS[relation.parent][0], SIGNALS[relation.child][0].lower()
     if surface.sweep == "parent":
         return f"{parent} apex"
     return f"{parent} ($r_1$) {surface.arrow} {child}"
