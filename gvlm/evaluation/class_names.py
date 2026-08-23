@@ -6,6 +6,8 @@
 # LICENSE file in the root directory of this source tree.
 # ---------------------------------------
 
+# Modified from github.com/facebookresearch/meru
+
 """
 List of class names per dataset, used to make prompts for zero-shot evaluation.
 Keys are name of Torchvision dataset classes, and values are list of class names.

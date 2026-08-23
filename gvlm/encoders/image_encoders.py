@@ -6,6 +6,8 @@
 # LICENSE file in the root directory of this source tree.
 # ---------------------------------------
 
+# Modified from github.com/facebookresearch/meru
+
 import timm
 import torch
 from torch import nn

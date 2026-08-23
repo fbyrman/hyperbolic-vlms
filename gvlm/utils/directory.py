@@ -1,3 +1,5 @@
+# Modified from github.com/tksmatsubara/PHyCLIP
+
 import os
 
 from omegaconf import DictConfig

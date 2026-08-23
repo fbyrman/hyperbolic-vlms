@@ -1,3 +1,5 @@
+# Modified from github.com/PalAvik/hycoclip
+
 from __future__ import annotations
 
 import csv

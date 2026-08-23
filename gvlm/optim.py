@@ -6,6 +6,8 @@
 # LICENSE file in the root directory of this source tree.
 # ---------------------------------------
 
+# Modified from github.com/facebookresearch/meru
+
 from __future__ import annotations
 
 import math

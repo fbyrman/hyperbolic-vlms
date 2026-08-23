@@ -1,3 +1,5 @@
+# Modified from github.com/tksmatsubara/PHyCLIP
+
 import torch
 from torch.nn import functional as F
 

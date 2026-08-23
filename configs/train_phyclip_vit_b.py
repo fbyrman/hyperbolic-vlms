@@ -7,6 +7,7 @@
 # ---------------------------------------
 
 # Modified from github.com/facebookresearch/meru
+# Modified from github.com/tksmatsubara/PHyCLIP
 
 """
 Each config file should have four dicts or OmegaConf objects:

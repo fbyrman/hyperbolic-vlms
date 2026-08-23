@@ -6,6 +6,8 @@
 # LICENSE file in the root directory of this source tree.
 # ---------------------------------------
 
+# Modified from github.com/facebookresearch/meru
+
 """
 Collection of common utilities for distributed training. These are wrappers over
 functions from :mod:`torch.distributed` module, but they do not raise exceptions

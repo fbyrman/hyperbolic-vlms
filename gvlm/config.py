@@ -6,6 +6,8 @@
 # LICENSE file in the root directory of this source tree.
 # ---------------------------------------
 
+# Modified from github.com/facebookresearch/meru
+
 """
 Core module for lazily instantiating objects from arbitrary configs. Many design
 choices in this module are heavily influenced by Detectron2.

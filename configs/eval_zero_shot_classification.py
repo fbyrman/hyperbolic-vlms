@@ -6,6 +6,8 @@
 # LICENSE file in the root directory of this source tree.
 # ---------------------------------------
 
+# Modified from github.com/facebookresearch/meru
+
 from gvlm.config import LazyCall as L
 from gvlm.evaluation.classification import ZeroShotClassificationEvaluator
 

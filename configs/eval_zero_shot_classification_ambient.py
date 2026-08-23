@@ -6,6 +6,8 @@
 # LICENSE file in the root directory of this source tree.
 # ---------------------------------------
 
+# Modified from github.com/facebookresearch/meru
+
 # The default config's suite, scored in the tangent space instead of on the
 # hyperboloid: `project=False`, skip `exp_map0`, rank by negative Euclidean
 # distance. Inert on `CLIPBaseline` and the `Euclidean*` controls, which have no
