@@ -1586,12 +1586,7 @@ class EuclideanHyCoCLIP(EuclideanMERU):
 
 
 class EuclideanPhyCLIP(EuclideanMERU):
-    """Euclidean ablation of PHyCLIP.
-
-    With Euclidean factors, sqrt(mean_i ||x_i - y_i||^2) equals ||x - y|| / sqrt(N),
-    so product_metric="l2" reduces to EuclideanMERU up to a constant the logit
-    scale absorbs. Only "l1" gives a different geometry.
-    """
+    """Euclidean ablation of PHyCLIP."""
 
     def __init__(
         self,

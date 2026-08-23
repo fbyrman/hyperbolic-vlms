@@ -4,8 +4,8 @@ Each ratio is hyperbolic over Euclidean, evaluated by the functions the two arms
 of the ablation call:
 
     distance    geodesic distance over the tangent-space chord
-    angle       `L.oxy_angle` over `E.oxy_angle` at the same apex
-    aperture    `L.half_aperture` over `E.half_aperture` at the twin's 2K/sqrt(c)
+    angle       `L.oxy_angle` over its flat form at the same apex
+    aperture    `L.half_aperture` over `E.half_aperture` at the control's 2K/sqrt(c)
 
 A row is one quantity on one relation: a pair of signals with one pinned at the
 mode of its radial distribution, `r_1`, and the other swept over `r_2`. The
@@ -19,7 +19,7 @@ the matched diagonal where it reads positives only.
 
     python scripts/plot_distortion_ratios.py \\
         --rows distance:text_image angle:text_image \\
-        --out outputs/curvature_main.pdf
+        --out outputs/distortion_main.pdf
 """
 
 import argparse
@@ -98,32 +98,61 @@ def _pair(n1, n2, theta):
     return torch.from_numpy(np.ascontiguousarray(x)), torch.from_numpy(y)
 
 
+# `lorentz` bounds its acos at 1 - 1e-8 and `euclidean` at 1 - 1e-6; with the far
+# point nearly along the ray both angles sit on their clamps and the quotient is
+# the ratio of the two floors. Both take the finer one.
+_ACOS_EPS = 1e-8
+
+
 def get_exterior_angle(r1, r2, c, theta):
     x, y = _pair(space_norm(r1, c), space_norm(r2, c), theta)
     return L.oxy_angle(x, y, curv=c).numpy()
 
 
-def get_flat_exterior_angle(r1, r2, theta):
-    """The same pair before `exp_map0`, where the radii are the tangent norms."""
-    x, y = _pair(r1, np.broadcast_to(r2, theta.shape), theta)
-    return E.oxy_angle(x, y).numpy()
+def get_flat_exterior_angle(r1, r2, theta, eps: float = _ACOS_EPS):
+    """The same pair before `exp_map0`, where the radii are the tangent norms.
+
+    Written out rather than calling `E.oxy_angle`, which is fixed to the coarser
+    bound: with the far point nearly along the ray both angles run into their
+    clamps, and there the quotient is the ratio of the two floors.
+    """
+    r2 = np.broadcast_to(r2, theta.shape)
+    d = np.sqrt(np.maximum(r1**2 + r2**2 - 2 * r1 * r2 * np.cos(theta), 0.0))
+    numer = r2**2 - r1**2 - d**2
+    denom = 2 * r1 * np.maximum(d, eps**0.5) + eps
+    return np.arccos(np.clip(numer / denom, -1.0 + eps, 1.0 - eps))
 
 
-def get_angle_ratio(r1, r2, c, theta, tol: float = 1e-6):
+# Below this the acos arguments of both angles sit close enough to 1 that the
+# quotient stops reporting geometry. The limit is a theta -> 0 reading at fixed
+# gap, so the bound is set where that assumption still holds rather than where
+# the limit first beats the numeric; the default grid's first column, at pi/299,
+# stays on the measured side.
+_LIMIT_THETA = 1e-3
+
+
+def get_angle_ratio(r1, r2, c, theta):
     ratio = get_exterior_angle(r1, r2, c, theta) / np.maximum(
         get_flat_exterior_angle(r1, r2, theta), 1e-15
     )
     # Both angles vanish as theta -> 0 with the far point outside and run to pi
     # with it inside, so the quotient is 0/0 on one half of that edge and 1 on
-    # the other. The law of sines gives the first limit.
+    # the other. The law of sines gives the first limit, which carries its own
+    # closing-gap case: it tends to sinh(xi)/xi, the coincident-point reading
+    # the distance ratio takes.
     xi1, xi2 = np.sqrt(c) * r1, np.sqrt(c) * np.broadcast_to(r2, theta.shape)
     gap = xi2 - xi1
-    outward = gap > tol
-    # `np.where` evaluates the branch it discards, so both factors are guarded:
+    outward = gap > 0
+    # `np.where` evaluates the branch it discards, so every factor is guarded:
     # an analytic window may start at `r2 = 0`, where `xi2` vanishes.
-    denom = np.where(outward, xi2, 1.0) * np.sinh(np.where(outward, gap, 1.0))
-    limit = np.where(outward, np.sinh(xi2) * gap / denom, 1.0)
-    return np.where(theta < tol, limit, ratio)
+    safe_gap = np.where(outward, gap, 1.0)
+    safe_xi2 = np.where(outward, xi2, 1.0)
+    # gap / sinh(gap) is 0/0 as the two radii meet; the series carries it.
+    scale = np.where(
+        safe_gap < 1e-4, 1.0 - safe_gap**2 / 6.0, safe_gap / np.sinh(safe_gap)
+    )
+    limit = np.where(outward, np.sinh(safe_xi2) / safe_xi2 * scale, 1.0)
+    return np.where(theta < _LIMIT_THETA, limit, ratio)
 
 
 def clamp_radius(c: float, min_radius: float) -> float:
@@ -147,7 +176,7 @@ def get_half_aperture(r, c, min_radius, eps: float = _ASIN_EPS):
 
 
 def get_flat_half_aperture(r, c, min_radius, eps: float = _ASIN_EPS):
-    """The same apex before `exp_map0`, at the twin's `aperture_k = 2K/sqrt(c)`.
+    """The same apex before `exp_map0`, at the control's `aperture_k = 2K/sqrt(c)`.
 
     Written out rather than calling `E.half_aperture`, which is fixed to the
     coarser bound.

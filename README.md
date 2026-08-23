@@ -1,9 +1,11 @@
-# Hyperbolic against Euclidean, grounded, on CC3M
+# How Hyperbolic Are Hyperbolic Vision-Language Models?
 
-Isolates what hyperbolic geometry contributes to grounded vision-language
-pretraining. MERU, HyCoCLIP, PHyCLIP and ARGENT are each trained against a
-Euclidean twin, at ViT-S/16 and ViT-B/16, on CC3M with region-level grounding,
-contrasting over four signals: images, image captions, boxes, box captions.
+Code for the paper. Each of MERU, HyCoCLIP, PHyCLIP and ARGENT is trained
+against a *Euclidean control*: the same loss, grounding, data and batch, with
+only the manifold changed. The pairing is the contribution, so a change that
+touches one arm and not the other invalidates the comparison. ViT-S/16 and
+ViT-B/16, on CC3M with region-level grounding, contrasting over four signals:
+images, image captions, boxes, box captions.
 
 Model weights will be made available upon publication.
 
@@ -123,9 +125,9 @@ python scripts/evaluate.py --config configs/eval_zero_shot_classification_ambien
 ```
 
 There is an `_ambient` config for each of the three tasks, each inheriting its
-default twin's suite and prompts so the two runs stay comparable dataset for
-dataset. The ablation is meaningless for the `Euclidean*` twins, which have no
-exponential map to remove, and they fall back to their default scoring.
+default counterpart's suite and prompts so the two runs stay comparable dataset
+for dataset. The ablation is meaningless for the `Euclidean*` controls, which
+have no exponential map to remove, and they fall back to their default scoring.
 
 ## Figures
 
@@ -141,7 +143,7 @@ python scripts/plot_origin_distances.py --arch s --euclidean
 ```
 
 One panel per model, one colour per signal, and a `.csv` beside the figure with
-the per-signal quantiles. `--euclidean` reads the ablation twins, where the
+the per-signal quantiles. `--euclidean` reads the Euclidean controls, where the
 radius is the plain norm; the panels keep their order so a pair reads side by
 side. Product-space radii are combined the way the model's own metric combines
 them, so a PHyCLIP radius is on the same footing as a MERU one.
@@ -156,7 +158,7 @@ flat space cannot.
 ```bash
 python scripts/plot_distortion_ratios.py \
     --rows distance:text_image angle:text_image \
-    --out outputs/curvature_main.pdf
+    --out outputs/distortion_main.pdf
 ```
 
 A row is one quantity read on one relation -- a pair of signals with one pinned
@@ -189,4 +191,4 @@ It is vendored from PHyCLIP at commit `0bf13d6` rather than submoduled, so the
 repository clones as one piece. It differs from upstream in that the package was
 renamed `phyclip` -> `gvlm`, training moved from GRIT to CC3M with GLIGEN
 grounding, ViT-L configs were dropped, the VL-Checklist and SugarCrepe
-evaluations were dropped, and ARGENT and the Euclidean twins were added.
+evaluations were dropped, and ARGENT and the Euclidean controls were added.

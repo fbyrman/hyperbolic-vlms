@@ -9,7 +9,7 @@
 # Modified from github.com/facebookresearch/meru
 
 """
-Train a MERU, HyCoCLIP, PHyCLIP or ARGENT model, or its Euclidean twin, based on
+Train a MERU, HyCoCLIP, PHyCLIP or ARGENT model, or its Euclidean control, based on
 parameters specified by a config file.
 """
 

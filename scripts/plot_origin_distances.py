@@ -5,7 +5,7 @@ hyperbolic claim rests on -- general concepts should sit near the origin and
 specific ones out towards the boundary -- so this draws the distribution each
 model actually produces on the data it was trained on.
 
-`--euclidean` reads the ablation twins instead, where the radius is the plain
+`--euclidean` reads the Euclidean controls instead, where the radius is the plain
 norm and the boundary it would run out to does not exist. Each figure covers one
 geometry: the panels stay in the same order so a pair can be read side by side.
 
@@ -313,7 +313,7 @@ def main():
     parser.add_argument("--num-samples", type=int, default=2048)
     parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument(
-        "--euclidean", action="store_true", help="Read the Euclidean ablation twins."
+        "--euclidean", action="store_true", help="Read the Euclidean controls."
     )
     parser.add_argument(
         "--results-dir",

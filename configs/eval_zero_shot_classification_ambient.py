@@ -8,7 +8,7 @@
 
 # The default config's suite, scored in the tangent space instead of on the
 # hyperboloid: `project=False`, skip `exp_map0`, rank by negative Euclidean
-# distance. Inert on `CLIPBaseline` and the `Euclidean*` twins, which have no
+# distance. Inert on `CLIPBaseline` and the `Euclidean*` controls, which have no
 # exponential map to remove.
 
 from gvlm.config import LazyCall as L
