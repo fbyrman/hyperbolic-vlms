@@ -1,16 +1,23 @@
 # How Hyperbolic Are Hyperbolic Vision-Language Models?
 
-Code for the paper. Each of MERU, HyCoCLIP, PHyCLIP and ARGENT is trained
-against a *Euclidean control*: the same loss, grounding, data and batch, with
-only the manifold changed. The pairing is the contribution, so a change that
-touches one arm and not the other invalidates the comparison. ViT-S/16 and
-ViT-B/16, on CC3M with region-level grounding, contrasting over four signals:
-images, image captions, boxes, box captions.
+Code for the paper, accepted to the proceedings track of NeurReps 2026, the
+NeurIPS workshop on Symmetry and Geometry in Neural Representations.
 
-An [interactive explainer](https://fbyrman.github.io/explainers/hyperbolic-vlms.html)
-walks through the argument. The 16 trained models are on the Hugging Face Hub at
-[`freek23/gvlm-checkpoints`](https://huggingface.co/freek23/gvlm-checkpoints),
-one `<method>[_euclidean]_vit_{s,b}/model.pth` per training config.
+Curvature enters a hyperbolic VLM through a single operation, the exponential
+map, and in MERU, HyCoCLIP, PHyCLIP and ARGENT that map is close to the
+identity. Each of the four is trained here against a *Euclidean control*: the
+same loss, grounding, data and batch, with only the manifold changed. The
+controls match their hyperbolic counterparts on evaluation and recover the same
+radial distributions. The pairing is the contribution, so a change that touches
+one arm and not the other invalidates the comparison.
+
+All runs are ViT-S/16 and ViT-B/16 on CC3M with region-level grounding,
+contrasting over four signals: images, image captions, boxes, box captions.
+
+- [Interactive explainer](https://fbyrman.github.io/explainers/hyperbolic-vlms.html):
+  the argument, step by step, in the browser.
+- [Checkpoints](https://huggingface.co/freek23/gvlm-checkpoints): all 16 models,
+  one `<method>[_euclidean]_vit_{s,b}/model.pth` per training config.
 
 ## Layout
 
