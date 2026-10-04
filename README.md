@@ -7,7 +7,10 @@ touches one arm and not the other invalidates the comparison. ViT-S/16 and
 ViT-B/16, on CC3M with region-level grounding, contrasting over four signals:
 images, image captions, boxes, box captions.
 
-Model weights will be made available upon publication.
+An [interactive explainer](https://fbyrman.github.io/explainers/hyperbolic-vlms.html)
+walks through the argument. The 16 trained models are on the Hugging Face Hub at
+[`freek23/gvlm-checkpoints`](https://huggingface.co/freek23/gvlm-checkpoints),
+one `<method>[_euclidean]_vit_{s,b}/model.pth` per training config.
 
 ## Layout
 
@@ -104,6 +107,15 @@ how to arrange them.
 ```bash
 python scripts/evaluate.py --config configs/eval_zero_shot_classification.py \
     --checkpoint-path train_results/<run>/checkpoint_final.pth \
+    --train-config configs/train_phyclip_vit_b.py
+```
+
+To evaluate a released model instead, download it and pass it the same way:
+
+```bash
+hf download freek23/gvlm-checkpoints phyclip_vit_b/model.pth --local-dir checkpoints
+python scripts/evaluate.py --config configs/eval_zero_shot_classification.py \
+    --checkpoint-path checkpoints/phyclip_vit_b/model.pth \
     --train-config configs/train_phyclip_vit_b.py
 ```
 
